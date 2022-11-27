@@ -35,6 +35,11 @@ abstract class NewLinuxPluginPlatform extends PlatformInterface {
     throw UnimplementedError('sendData() has not been implemented.');
   }
 
+
+  Future<bool?> endData() {
+    throw UnimplementedError('endData() has not been implemented.');
+  }
+
   Future<bool?> initMessageQueue() {
     throw UnimplementedError('initMessageQueue() has not been implemented.');
   }

@@ -23,7 +23,13 @@ class MethodChannelNewLinuxPlugin extends NewLinuxPluginPlatform {
 
   @override
   Future<bool?> sendData() async {
-    final end = await methodChannel.invokeMethod<bool>('sendData');
+    final send = await methodChannel.invokeMethod<bool>('sendData');
+    return send;
+  }
+
+  @override
+  Future<bool?> endData() async {
+    final end = await methodChannel.invokeMethod<bool>('endData');
     return end;
   }
 

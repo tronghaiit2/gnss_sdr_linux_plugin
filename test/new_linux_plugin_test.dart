@@ -21,6 +21,9 @@ class MockNewLinuxPluginPlatform
   Future<bool?> endMessageQueue() => Future.value(true);
   
   @override
+  Future<bool?> endData() => Future.value(true);
+  
+  @override
   Future<bool?> sendData() => Future.value(true);
 
 }
@@ -46,6 +49,14 @@ void main() {
     NewLinuxPluginPlatform.instance = fakePlatform;
 
     expect(await newLinuxPlugin.sendData(), true);
+  });
+
+  test('endData', () async {
+    NewLinuxPlugin newLinuxPlugin = NewLinuxPlugin();
+    MockNewLinuxPluginPlatform fakePlatform = MockNewLinuxPluginPlatform();
+    NewLinuxPluginPlatform.instance = fakePlatform;
+
+    expect(await newLinuxPlugin.endData(), true);
   });
 
   test('receiveData', () async {

@@ -11,6 +11,9 @@ class NewLinuxPlugin {
   Future<bool?> sendData() {
     return NewLinuxPluginPlatform.instance.sendData();
   }
+  Future<bool?> endData() {
+    return NewLinuxPluginPlatform.instance.endData();
+  }
   Future<bool?> initMessageQueue() {
     return NewLinuxPluginPlatform.instance.initMessageQueue();
   }

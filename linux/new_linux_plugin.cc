@@ -14,6 +14,13 @@
 #include <sys/msg.h>
 #include <string.h>
 
+#include <thread>
+#include <chrono>
+#include <sstream>
+#include <iostream>
+#include <vector>
+#include <map>
+
 #define NEW_LINUX_PLUGIN(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), new_linux_plugin_get_type(), \
                               NewLinuxPlugin))
@@ -21,7 +28,7 @@
 #define PERMS 0644
 struct my_msgbuf {
    long mtype;
-   char mtext[200];
+   char mtext[256];
 };
 
 struct _NewLinuxPlugin {
@@ -35,6 +42,63 @@ int msqid = -1;
 int toend;
 key_t key;
 
+std::map<int, float> listData;
+
+void receiveData() {
+  std::map<int, float> list_Data;
+  long diff;
+  std::chrono::time_point<std::chrono::system_clock> start, end;
+  start = std::chrono::system_clock::now();
+  for(;;) {
+    end = std::chrono::system_clock::now();
+    diff = std::chrono::duration_cast< std::chrono::milliseconds >(
+      end.time_since_epoch() - start.time_since_epoch()).count();
+    if(diff > 900) {
+      break;
+    }
+    ssize_t siz = msgrcv(msqid, &buf, sizeof(buf.mtext), 0, IPC_NOWAIT);
+    if (siz<0) {
+      if (errno == ENOMSG) 
+        {
+          if(diff > 800 && list_Data.empty()) {
+            toend = 0;
+            break;
+          }
+        }
+      else {
+        perror("msgrcv");
+      }
+    } 
+    else {
+      std::vector<float> data_list;
+      std::stringstream ss;
+      ss << buf.mtext;
+      while(!ss.eof()){
+          std::string x;
+          ss >> x;
+          float y = atof(x.c_str());
+          if(y > 0) data_list.push_back(y);
+      }
+      list_Data.insert(std::make_pair(data_list[0], data_list[1]));
+      // std::map<int, float>::iterator it = listData.find(data_list[0]); 
+      // if (it == listData.end()) {
+      //   listData.insert(std::make_pair(data_list[0], data_list[1]));
+      // }
+      // else {
+      //   if(data_list[1] > it->second) {
+      //     it->second = data_list[1];
+      //   } 
+      // }
+
+      // printf("recvd: %s\n", buf.mtext);
+      toend = strcmp(buf.mtext,"end");
+      if (toend == 0 || sizeof(buf.mtext) == 0) 
+      break;
+    }
+  }
+  listData = list_Data;
+}
+
 // Called when a method call is received from Flutter.
 static void new_linux_plugin_handle_method_call(
     NewLinuxPlugin* self,
@@ -44,41 +108,74 @@ static void new_linux_plugin_handle_method_call(
   const gchar* method = fl_method_call_get_name(method_call);
 
   if (strcmp(method, "receiveData") == 0) {
-    if(msqid != -1) {
-      if (msgrcv(msqid, &buf, sizeof(buf.mtext), 0, 0) == -1) {
-          perror("msgrcv");
-          exit(1);
+      // std::thread receiveDataThread(receiveData);
+      // receiveDataThread.join();
+      // receiveDataThread.detach();
+      if(toend == 0 && listData.empty()) {
+        g_autofree gchar *data = g_strdup_printf("%s", "end");
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
       }
-
-      if (strcmp(buf.mtext,"end") == 0) {
-        // system("rm /tmp/msgq.txt");
+      else {
+        int ELEMENTSIZE = 20;
+        int BUFSIZE = listData.size()*ELEMENTSIZE;
+        char dataSent[BUFSIZE];
+        strcpy(dataSent, "");
+        strcat(dataSent, "{");
+        // strcat(dataSent, "[{\"ID\":0}");
+        for(auto it = listData.cbegin(); it != listData.cend(); ++it)
+        {
+            // std::cout << it->first << " " << it->second<< "\n";
+            char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            strcat(dataSent, str);
+            free(str);
+        }
+        // strcat(dataSent, "]");
+        dataSent[strlen(dataSent) - 1] = '}';
+              
+        // printf("%s\n", dataSent);
+        g_autofree gchar *data = g_strdup_printf("%s", dataSent);
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
       }
-
-      g_autofree gchar *data = g_strdup_printf("%s", buf.mtext);
-      g_autoptr(FlValue) result = fl_value_new_string(data);
-      response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-      fl_method_call_respond(method_call, response, nullptr);
-    }
   }
   else if (strcmp(method, "sendData") == 0) {
-    // system("/home/haint/pipe_test/./send");
-    system("/tmp/./send");
+    std::thread receiveDataThread(receiveData);
+    receiveDataThread.detach();
+
+    g_autoptr(FlValue) result = fl_value_new_bool(true);
+    response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+    fl_method_call_respond(method_call, response, nullptr);
+  }
+  else if (strcmp(method, "endData") == 0) {
+    strcpy(buf.mtext, "end");
+    if (msgsnd(msqid, &buf, 4, 0) == -1) /* +1 for '\0' */
+    perror("msgsnd");
 
     g_autoptr(FlValue) result = fl_value_new_bool(true);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
     fl_method_call_respond(method_call, response, nullptr);
   }
   else if (strcmp(method, "initMessageQueue") == 0) {
-    system("touch /tmp/msgq.txt");
-
-    if ((key = ftok("/tmp/msgq.txt", 'B')) == -1) {
-      perror("ftok");
-      exit(1);
+    
+    const char* file = "/tmp/tracking.txt";
+    int BUFSIZE = 32;
+    char *cmd = (char*) malloc(sizeof(char) * BUFSIZE);
+    snprintf(cmd, BUFSIZE, "touch %s", file);
+    system(cmd);
+    free(cmd);
+    
+    if ((key = ftok(file, 'B')) == -1) {
+        perror("ftok");
+        // exit(1);
     }
     
     if ((msqid = msgget(key, PERMS | IPC_CREAT)) == -1) {
       perror("msgget");
-      exit(1);
+      // exit(1);
     }
 
     g_autoptr(FlValue) result = fl_value_new_bool(true);
@@ -88,9 +185,9 @@ static void new_linux_plugin_handle_method_call(
   else if (strcmp(method, "endMessageQueue") == 0) {
     if (msgctl(msqid, IPC_RMID, NULL) == -1) {
       perror("msgctl");
-      exit(1);
+      // exit(1);
     }
-    system("rm /tmp/msgq.txt");
+    system("rm /tmp/tracking.txt");
 
     g_autoptr(FlValue) result = fl_value_new_bool(true);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));

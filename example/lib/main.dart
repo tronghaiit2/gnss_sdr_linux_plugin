@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:new_linux_plugin_example/ui/home/Home.dart';
 
 void main() {
+   WidgetsFlutterBinding.ensureInitialized();
   runApp(const GNSS_SDR());
 }
 
