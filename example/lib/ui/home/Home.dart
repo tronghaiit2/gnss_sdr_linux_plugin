@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 
@@ -5,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_linux_plugin/new_linux_plugin.dart';
+import 'package:new_linux_plugin_example/ui/MultiChoice.dart';
 import 'package:new_linux_plugin_example/ui/common_widgets/Buttons.dart';
 import 'package:new_linux_plugin_example/ui/common_widgets/NotificationDialog.dart';
 import 'package:new_linux_plugin_example/utils/ColorConstant.dart';
@@ -26,6 +28,8 @@ class _HomeState extends State<Home> {
 
   late List<_ChartData> data;
   late TooltipBehavior _tooltip;
+
+  late List<String> gpsPRNSelectedList;
 
   void initData() {
     data = [
@@ -127,6 +131,10 @@ class _HomeState extends State<Home> {
     Process.run(cmd, []);
   }
 
+    void _sendData() async {
+    _newLinuxPlugin.sendData();
+  }
+
   Future<bool?> _endData() async {
     bool endData;
     try {
@@ -139,38 +147,50 @@ class _HomeState extends State<Home> {
   }
 
   void loopReceiver() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    initData();
     loop = true;
-    int start, end, dif;
+    // int start, end, dif;
+    int errorCount = 0;
     while(loop) {
-      start = DateTime.now().millisecondsSinceEpoch;
-      await Future.delayed(const Duration(seconds: 0), () async {
+      _sendData();
+      // start = DateTime.now().millisecondsSinceEpoch;
+      await Future.delayed(const Duration(milliseconds: 980), () async {
         try {
           final String? result = await _receiveData();
           if(result != null) {
             if(result == "end") {
-              isSending = false;
-              loop = false;
+              errorCount++;
+              if(errorCount > 4) {
+                isSending = false;
+                loop = false;
+                // ignore: use_build_context_synchronously
+                showWarningDialog("Can not receive GPS signal!", context);
+              }
             } else {
+              errorCount = 0;
               Map<String, dynamic> data_list = json.decode(result);
               for(var item in data_list.entries){
                 double CN0 = item.value;
                 if(CN0 > 0) data[int.parse(item.key)-1].y = CN0;
               }
+              setState(() {
+                
+              });
+            }
+          } else {
+            errorCount++;
+            if(errorCount > 4) {
+              isSending = false;
+              loop = false;
+              // ignore: use_build_context_synchronously
+              showWarningDialog("Can not receive GPS signal!", context);
             }
           }
-          end = DateTime.now().millisecondsSinceEpoch;
-          dif = 1000 - (end - start);
-          if(dif > 0) {
-            Future.delayed(Duration(milliseconds:  dif), () => {
-              setState(() {
-                if (kDebugMode) {
-                  print(dif);
-                }
-              })
-            });
-          }
+          // end = DateTime.now().millisecondsSinceEpoch;
+          // dif = 1000 - (end - start);
+          // if(dif > 0) {
+          //   Future.delayed(Duration(milliseconds:  dif), () => {
+          //   });
+          // }
         } on Exception catch (e) {
           isSending = false;
           loop = false;
@@ -183,122 +203,185 @@ class _HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Row(
       children: [
-       SizedBox(
-        width: 300,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'GNSS_GPS_SDR',
-            ),
-            Text('Running on: $_platformVersion\n', maxLines: 2,),
-            SizedBox(height: 20,),
-            confirmButton("Init MessageQueue", (){
-              _initMessageQueue();
-              messageQueueAvailable = true;
-            }),
-            SizedBox(height: 20,),
-            confirmButton("Send Data", () async {
-              if(loop) {
-                showWarningDialog("Please waiting for end of data before", context);
-              }
-              else {
-                if(messageQueueAvailable) {
-                  // Process.run("example/assets/tmp/send", []);     
-                  isSending = true;
-                }
-              }
-            }),
-            SizedBox(height: 20,),
-            confirmButton("Start GPS_SDR", (){
-              if(loop) {
-                showWarningDialog("Please waiting for end of Message Queue, then start again", context);
-              }
-              else {
-              if(messageQueueAvailable) {
-                if(isSending) {
-                  // send();
-                  loopReceiver();
+        SizedBox(
+          width: 300,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              const Text(
+                'GNSS_GPS_SDR',
+              ),
+              Text('Running on: $_platformVersion\n', maxLines: 2,),
+              SizedBox(height: 20,),
+              confirmButton("Init MessageQueue", (){
+                _initMessageQueue();
+                messageQueueAvailable = true;
+              }),
+              SizedBox(height: 20,),
+              confirmButton("Send Data", () async {
+                if(loop) {
+                  showWarningDialog("Please waiting for end of data before", context);
                 }
                 else {
-                  showConfirmDialog("Not available to send data", "Start to send data by click \"Start\" and Start GPS_SDR again", 
-                  (){
-                    // Process.run("assets/tmp/send", []);
+                  if(messageQueueAvailable) {
+                    // Process.run("example/assets/tmp/send", []);     
                     isSending = true;
-                  }, 
-                  (){}, context, "Start", "Cancel");
-                }
-              }
-              else {
-                showConfirmDialog("Please Init MessageQueue", "init MessageQueue by click \"Init\" and Start GPS_SDR again", 
-                (){
-                  if(!messageQueueAvailable) {
-                    _initMessageQueue();
-                    messageQueueAvailable = true; 
                   }
-                }, 
-                (){}, context, "Init", "Cancel");
-              }
-              }
-            }),
-            SizedBox(height: 20,),
-            confirmButton("Stop receive Data", () async {
-              isSending = false;
-              loop = false;
-              // await _endData();
-            }),
-            SizedBox(height: 20,),
-            confirmButton("Clear MessageQueue", (){
-              if(loop) {
-                showWarningDialog("Please waiting for end of Message Queue, then clear queue", context);
-              }
-              else {
-                if(messageQueueAvailable) {
-                  _endMessageQueue();
-                  messageQueueAvailable = false;
                 }
-              }
-            }),
-          ],
-        ),
+              }),
+              SizedBox(height: 20,),
+              confirmButton("Start GPS_SDR", (){
+                if(loop) {
+                  showWarningDialog("Please waiting for end of Message Queue, then start again", context);
+                }
+                else {
+                if(messageQueueAvailable) {
+                  if(isSending) {
+                    // send();
+                    loopReceiver();
+                  }
+                  else {
+                    showConfirmDialog("Not available to send data", "Start to send data by click \"Start\" and Start GPS_SDR again", 
+                    (){
+                      // Process.run("assets/tmp/send", []);
+                      isSending = true;
+                    }, 
+                    (){}, context, "Start", "Cancel");
+                  }
+                }
+                else {
+                  showConfirmDialog("Please Init MessageQueue", "init MessageQueue by click \"Init\" and Start GPS_SDR again", 
+                  (){
+                    if(!messageQueueAvailable) {
+                      _initMessageQueue();
+                      messageQueueAvailable = true; 
+                    }
+                  }, 
+                  (){}, context, "Init", "Cancel");
+                }
+                }
+              }),
+              SizedBox(height: 20,),
+              confirmButton("Stop receive Data", () async {
+                isSending = false;
+                loop = false;
+                // await _endData();
+              }),
+              SizedBox(height: 20,),
+              confirmButton("Clear MessageQueue", (){
+                if(loop) {
+                  showWarningDialog("Please waiting for end of Message Queue, then clear queue", context);
+                }
+                else {
+                  if(messageQueueAvailable) {
+                    _endMessageQueue();
+                    messageQueueAvailable = false;
+                  }
+                }
+              }),
+            ],
+          ),
         ),
         Expanded(
-          child: Container(
-              width: 1000,
-              margin: const EdgeInsets.all(10.0),
-              padding: const EdgeInsets.all(5.0),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent)
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    height: 300,
+                    width: 1280,
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.blueGrey, width: 2)
+                    ),
+                    child: MultiChoice(
+                      onSelectParam: (HashSet<String> selectedList) {
+                        // do something with param
+                        gpsPRNSelectedList = selectedList.toList();
+                        print(gpsPRNSelectedList.toString());
+                      }
+                    ),
+                  ),
+                ],
               ),
-            child: SfCartesianChart(
-            primaryXAxis: CategoryAxis(
-              title: AxisTitle(text: "Satelite")
-            ),
-            primaryYAxis: NumericAxis(
-              title: AxisTitle(text: "C/N0 (dB)"),
-              minimum: 0, interval: 10
-            ),
-            legend: Legend(
-              isVisible: true,
-              alignment: ChartAlignment.near
-            ),
-            tooltipBehavior: _tooltip,
-            series: <ChartSeries<_ChartData, String>>[
-              ColumnSeries<_ChartData, String>(
-                  borderRadius: BorderRadius.all(Radius.circular(5)),
-                  dataSource: data,
-                  isVisible: true,
-                  isVisibleInLegend: true,
-                  legendItemText: "C/N0 index of\neach Satelite (dB)",
-                  legendIconType: LegendIconType.rectangle,
-                  // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
-                  xValueMapper: (_ChartData data, _) => data.x,
-                  yValueMapper: (_ChartData data, _) => data.y,
-                  name: 'dB',
-                  color: Colors.blueAccent)
-            ]),
-          ),
-        )
+              Expanded(
+                child: Container(
+                  width: 1000,
+                  margin: const EdgeInsets.only(top: 10.0, bottom: 10.0, right: 10.0),
+                  padding: const EdgeInsets.all(5.0),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blueAccent)
+                  ),
+                  child: SfCartesianChart(
+                  primaryXAxis: CategoryAxis(
+                    title: AxisTitle(text: "Satelite")
+                  ),
+                  primaryYAxis: NumericAxis(
+                    title: AxisTitle(text: "C/N0 (dB)"),
+                    minimum: 0, interval: 10
+                  ),
+                  legend: Legend(
+                    isVisible: true,
+                    alignment: ChartAlignment.near
+                  ),
+                  tooltipBehavior: _tooltip,
+                  series: <ChartSeries<_ChartData, String>>[
+                    ColumnSeries<_ChartData, String>(
+                        borderRadius: BorderRadius.all(Radius.circular(5)),
+                        dataSource: data,
+                        isVisible: true,
+                        isVisibleInLegend: true,
+                        legendItemText: "C/N0 index of\neach Satelite (dB)",
+                        legendIconType: LegendIconType.rectangle,
+                        // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+                        xValueMapper: (_ChartData data, _) => data.x,
+                        yValueMapper: (_ChartData data, _) => data.y,
+                        name: 'dB',
+                        color: Colors.blueAccent)
+                  ]),
+                ),
+              )
+            ],
+          )
+        ),
+
+        // Expanded(
+        //   child: Container(
+        //       width: 1000,
+        //       margin: const EdgeInsets.all(10.0),
+        //       padding: const EdgeInsets.all(5.0),
+        //       decoration: BoxDecoration(
+        //         border: Border.all(color: Colors.blueAccent)
+        //       ),
+        //     child: SfCartesianChart(
+        //     primaryXAxis: CategoryAxis(
+        //       title: AxisTitle(text: "Satelite")
+        //     ),
+        //     primaryYAxis: NumericAxis(
+        //       title: AxisTitle(text: "C/N0 (dB)"),
+        //       minimum: 0, interval: 10
+        //     ),
+        //     legend: Legend(
+        //       isVisible: true,
+        //       alignment: ChartAlignment.near
+        //     ),
+        //     tooltipBehavior: _tooltip,
+        //     series: <ChartSeries<_ChartData, String>>[
+        //       ColumnSeries<_ChartData, String>(
+        //           borderRadius: BorderRadius.all(Radius.circular(5)),
+        //           dataSource: data,
+        //           isVisible: true,
+        //           isVisibleInLegend: true,
+        //           legendItemText: "C/N0 index of\neach Satelite (dB)",
+        //           legendIconType: LegendIconType.rectangle,
+        //           // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+        //           xValueMapper: (_ChartData data, _) => data.x,
+        //           yValueMapper: (_ChartData data, _) => data.y,
+        //           name: 'dB',
+        //           color: Colors.blueAccent)
+        //     ]),
+        //   ),
+        // )
       ],
     );
   }

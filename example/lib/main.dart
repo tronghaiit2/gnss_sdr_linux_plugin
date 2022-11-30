@@ -19,9 +19,9 @@ class _GNSS_SDRState extends State<GNSS_SDR> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(
-          title: const Text('GNSS SDR Application'),
-        ),
+        // appBar: AppBar(
+        //   title: const Text('GNSS SDR Application'),
+        // ),
         body: 
         Center(
           child: Home()
