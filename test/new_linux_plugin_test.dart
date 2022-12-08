@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:new_linux_plugin/new_linux_plugin.dart';
 import 'package:new_linux_plugin/new_linux_plugin_platform_interface.dart';
@@ -13,6 +15,12 @@ class MockNewLinuxPluginPlatform
   
   @override
   Future<String?> receiveData() => Future.value('json_test');
+  @override
+  Future<String?> receiveCN0() => Future.value('json_test');
+  @override
+  Future<String?> receivePromptI() => Future.value('json_test');
+  @override
+  Future<String?> receivePromptQ() => Future.value('json_test');
     
   @override
   Future<bool?> initMessageQueue() => Future.value(true);

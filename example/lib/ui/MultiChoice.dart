@@ -67,9 +67,9 @@ class _MultiChoiceState extends State<MultiChoice> {
         ),
         title: Text("Select GPS Satellite"),
         actions: [
-          Visibility(
-              visible: selectedItem.isNotEmpty,
-              child: 
+          // Visibility(
+          //     visible: selectedItem.isNotEmpty,
+          //     child: 
               Container(
                 margin: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
@@ -85,7 +85,7 @@ class _MultiChoiceState extends State<MultiChoice> {
                     onTap: () => {
                       widget.onSelectParam(selectedItem)
                     },
-                    child: Row(children: const [
+                    child: Row(children: [
                       SizedBox(
                         width: 20,
                       ),
@@ -93,8 +93,8 @@ class _MultiChoiceState extends State<MultiChoice> {
                       SizedBox(
                         width: 10,
                       ),
-                      Text(
-                        "Confirm",
+                       Text(
+                        selectedItem.isNotEmpty ? "Confirm" : "Close",
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 16,
@@ -108,37 +108,7 @@ class _MultiChoiceState extends State<MultiChoice> {
                   ),
                 ),
               ),
-              // Container(
-              //   // color: AppColors.green,
-              //   child: InkWell(
-              //     hoverColor: AppColors.orange,
-              //     splashColor: AppColors.green,
-              //     onTap: () => {
-              //       widget.onSelectParam(selectedItem)
-              //     },
-              //     child: Row(children: const [
-              //       SizedBox(
-              //         width: 20,
-              //       ),
-              //       Icon(Icons.check_rounded),
-              //       SizedBox(
-              //         width: 10,
-              //       ),
-              //       Text(
-              //         "Confirm",
-              //         style: TextStyle(
-              //           color: Colors.white,
-              //           fontSize: 16,
-              //           fontWeight: FontWeight.bold,
-              //         )
-              //       ),
-              //       SizedBox(
-              //         width: 20,
-              //       )
-              //     ],),
-              //   ),
-              // )
-            ),
+            // ),
           // IconButton(
           //   icon: Icon(
           //     Icons.select_all,

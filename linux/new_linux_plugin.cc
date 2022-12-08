@@ -43,9 +43,15 @@ int toend;
 key_t key;
 
 std::map<int, float> listData;
+std::map<int, float> listCN0;
+std::map<int, float> listPromptI;
+std::map<int, float> listPromptQ;
 
 void receiveData() {
   std::map<int, float> list_Data;
+  std::map<int, float> list_CN0;
+  std::map<int, float> list_PromptI;
+  std::map<int, float> list_PromptQ;
   long diff;
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now();
@@ -71,6 +77,7 @@ void receiveData() {
     } 
     else {
       std::vector<float> data_list;
+      std::map<int, float>::iterator it;
       std::stringstream ss;
       ss << buf.mtext;
       while(!ss.eof()){
@@ -80,15 +87,31 @@ void receiveData() {
           if(y > 0) data_list.push_back(y);
       }
       list_Data.insert(std::make_pair(data_list[0], data_list[1]));
-      // std::map<int, float>::iterator it = listData.find(data_list[0]); 
-      // if (it == listData.end()) {
-      //   listData.insert(std::make_pair(data_list[0], data_list[1]));
-      // }
-      // else {
-      //   if(data_list[1] > it->second) {
-      //     it->second = data_list[1];
-      //   } 
-      // }
+      list_CN0.insert(std::make_pair(data_list[0], data_list[1]));
+      list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
+      list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
+
+      // get max PromptI
+      it = list_PromptI.find(data_list[0]); 
+      if (it == list_PromptI.end()) {
+        list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
+      }
+      else {
+        if(data_list[2] > it->second) {
+          it->second = data_list[2];
+        }
+      }
+
+      // get max PromptQ
+      it = list_PromptQ.find(data_list[0]); 
+      if (it == list_PromptQ.end()) {
+        list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
+      }
+      else {
+        if(data_list[3] > it->second) {
+          it->second = data_list[3];
+        }
+      }
 
       // printf("recvd: %s\n", buf.mtext);
       toend = strcmp(buf.mtext,"end");
@@ -97,6 +120,9 @@ void receiveData() {
     }
   }
   listData = list_Data;
+  listCN0 = list_CN0;
+  listPromptI = list_PromptI;
+  listPromptQ = list_PromptQ;
 }
 
 // Called when a method call is received from Flutter.
@@ -125,6 +151,102 @@ static void new_linux_plugin_handle_method_call(
         strcat(dataSent, "{");
         // strcat(dataSent, "[{\"ID\":0}");
         for(auto it = listData.cbegin(); it != listData.cend(); ++it)
+        {
+            // std::cout << it->first << " " << it->second<< "\n";
+            char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            strcat(dataSent, str);
+            free(str);
+        }
+        // strcat(dataSent, "]");
+        dataSent[strlen(dataSent) - 1] = '}';
+              
+        // printf("%s\n", dataSent);
+        g_autofree gchar *data = g_strdup_printf("%s", dataSent);
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+  }
+  else if (strcmp(method, "receiveCN0") == 0) {
+      if(toend == 0 && listCN0.empty()) {
+        g_autofree gchar *data = g_strdup_printf("%s", "end");
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+      else {
+        int ELEMENTSIZE = 20;
+        int BUFSIZE = listCN0.size()*ELEMENTSIZE;
+        char dataSent[BUFSIZE];
+        strcpy(dataSent, "");
+        strcat(dataSent, "{");
+        // strcat(dataSent, "[{\"ID\":0}");
+        for(auto it = listCN0.cbegin(); it != listCN0.cend(); ++it)
+        {
+            // std::cout << it->first << " " << it->second<< "\n";
+            char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            strcat(dataSent, str);
+            free(str);
+        }
+        // strcat(dataSent, "]");
+        dataSent[strlen(dataSent) - 1] = '}';
+              
+        // printf("%s\n", dataSent);
+        g_autofree gchar *data = g_strdup_printf("%s", dataSent);
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+  }
+  else if (strcmp(method, "receivePromptI") == 0) {
+      if(toend == 0 && listPromptI.empty()) {
+        g_autofree gchar *data = g_strdup_printf("%s", "end");
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+      else {
+        int ELEMENTSIZE = 20;
+        int BUFSIZE = listPromptI.size()*ELEMENTSIZE;
+        char dataSent[BUFSIZE];
+        strcpy(dataSent, "");
+        strcat(dataSent, "{");
+        // strcat(dataSent, "[{\"ID\":0}");
+        for(auto it = listPromptI.cbegin(); it != listPromptI.cend(); ++it)
+        {
+            // std::cout << it->first << " " << it->second<< "\n";
+            char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            strcat(dataSent, str);
+            free(str);
+        }
+        // strcat(dataSent, "]");
+        dataSent[strlen(dataSent) - 1] = '}';
+              
+        // printf("%s\n", dataSent);
+        g_autofree gchar *data = g_strdup_printf("%s", dataSent);
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+  } 
+  else if (strcmp(method, "receivePromptQ") == 0) {
+      if(toend == 0 && listPromptQ.empty()) {
+        g_autofree gchar *data = g_strdup_printf("%s", "end");
+        g_autoptr(FlValue) result = fl_value_new_string(data);
+        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+        fl_method_call_respond(method_call, response, nullptr);
+      }
+      else {
+        int ELEMENTSIZE = 20;
+        int BUFSIZE = listPromptQ.size()*ELEMENTSIZE;
+        char dataSent[BUFSIZE];
+        strcpy(dataSent, "");
+        strcat(dataSent, "{");
+        // strcat(dataSent, "[{\"ID\":0}");
+        for(auto it = listPromptQ.cbegin(); it != listPromptQ.cend(); ++it)
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);

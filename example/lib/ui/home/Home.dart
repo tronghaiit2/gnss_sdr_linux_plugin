@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_linux_plugin/new_linux_plugin.dart';
+import 'package:new_linux_plugin_example/models/GnssSdrController.dart';
 import 'package:new_linux_plugin_example/ui/MultiChoice.dart';
 import 'package:new_linux_plugin_example/ui/common_widgets/Buttons.dart';
 import 'package:new_linux_plugin_example/ui/common_widgets/NotificationDialog.dart';
@@ -22,108 +23,29 @@ class Home extends StatefulWidget {
 class _HomeState extends State<Home> {
   String _platformVersion = 'Unknown';
   static final _newLinuxPlugin = NewLinuxPlugin();
+  late GnssSdrController gnssSdrController;
   late bool messageQueueAvailable = false;
   late bool loop = false;
   late bool isSending = false;
 
-  late List<_ChartData> data;
+  late List<List<_ChartData>> data;
   late TooltipBehavior _tooltip;
 
   late List<String> gpsPRNSelectedList;
+  late int itemsSelected = 1;
 
   void initData() {
-    data = [
-      _ChartData('01', 0),
-      _ChartData('02', 0),
-      _ChartData('03', 0),
-      _ChartData('04', 0),
-      _ChartData('05', 0),
-      _ChartData('06', 0),
-      _ChartData('07', 0),
-      _ChartData('08', 0),
-      _ChartData('09', 0),
-      _ChartData('10', 0),
-      _ChartData('11', 0),
-      _ChartData('12', 0),
-      _ChartData('13', 0),
-      _ChartData('14', 0),
-      _ChartData('15', 0),
-      _ChartData('16', 0),
-      _ChartData('17', 0),
-      _ChartData('18', 0),
-      _ChartData('19', 0),
-      _ChartData('20', 0),
-      _ChartData('21', 0),
-      _ChartData('22', 0),
-      _ChartData('23', 0),
-      _ChartData('24', 0),
-      _ChartData('25', 0),
-      _ChartData('26', 0),
-      _ChartData('27', 0),
-      _ChartData('28', 0),
-      _ChartData('29', 0),
-      _ChartData('30', 0),
-      _ChartData('31', 0),
-      _ChartData('32', 0),
-    ];
+    DateTime dateTime = DateTime.now();
+    data = [[_ChartData(dateTime, 0)], 
+    [], [], [], [], [], [], [], []];
   }
+  
   @override
   void initState() {
     super.initState();
-    initPlatformState();
     initData();
+    gnssSdrController = GnssSdrController(newLinuxPlugin: _newLinuxPlugin);
     _tooltip = TooltipBehavior(enable: true);
-  }
-
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    try {
-      platformVersion =
-          await _newLinuxPlugin.getPlatformVersion() ?? 'Unknown platform version';
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
-    });
-  }
-
-  Future<bool?> _initMessageQueue() async {
-    bool init;
-    try {
-      init =
-          await _newLinuxPlugin.initMessageQueue() ?? false;
-    } on Exception {
-      init = false;
-    }
-    return init;
-  }
-
-  Future<bool?> _endMessageQueue() async {
-    bool end;
-    try {
-      end =
-          await _newLinuxPlugin.endMessageQueue() ?? false;
-    } on Exception {
-      end = false;
-    }
-    return end;
-  }
-
-  static Future<String?> _receiveData() async {
-    String? receiveData;
-    try {
-      receiveData =
-          await _newLinuxPlugin.receiveData();
-    } on Exception {
-      if (kDebugMode) {
-        print("exception");
-      }
-    }
-    return receiveData;
   }
 
   void sendData(String file) {
@@ -131,31 +53,22 @@ class _HomeState extends State<Home> {
     Process.run(cmd, []);
   }
 
-    void _sendData() async {
-    _newLinuxPlugin.sendData();
-  }
-
-  Future<bool?> _endData() async {
-    bool endData;
-    try {
-      endData =
-          await _newLinuxPlugin.endData() ?? false;
-    } on Exception {
-      endData = false;
-    }
-    return endData;
-  }
 
   void loopReceiver() async {
+    initData();
     loop = true;
-    // int start, end, dif;
     int errorCount = 0;
+    // int start, end, dif;
     while(loop) {
-      _sendData();
+      gnssSdrController.sendData();
       // start = DateTime.now().millisecondsSinceEpoch;
-      await Future.delayed(const Duration(milliseconds: 980), () async {
+      await Future.delayed(const Duration(milliseconds: 975), () async {
         try {
-          final String? result = await _receiveData();
+          // final String? result = await _receiveData();
+          // final String? result = await _receiveCN0();
+          // final String? result = await _receivePromptI();
+          final String? result = await gnssSdrController.receivePromptQ();
+          DateTime dateTime = DateTime.now();
           if(result != null) {
             if(result == "end") {
               errorCount++;
@@ -168,12 +81,24 @@ class _HomeState extends State<Home> {
             } else {
               errorCount = 0;
               Map<String, dynamic> data_list = json.decode(result);
-              for(var item in data_list.entries){
-                double CN0 = item.value;
-                if(CN0 > 0) data[int.parse(item.key)-1].y = CN0;
+              while(data[0].length > 60) {
+                for(int i = 0; i < itemsSelected; i++){
+                  data[i].removeAt(0);
+                }
               }
+              
+              for(int i = 1; i < itemsSelected; i++){
+                if(data_list[gpsPRNSelectedList[i-1]] == null || data_list[gpsPRNSelectedList[i-1]] < 0) {
+                  data[i].add(_ChartData(dateTime, 0));
+                } else {
+                  data[i].add(_ChartData(dateTime, data_list[gpsPRNSelectedList[i-1]]));
+                }
+              }
+              
               setState(() {
-                
+                if(data[1].length > 1) {
+                  data[0].add(_ChartData(dateTime, 0));
+                }
               });
             }
           } else {
@@ -214,7 +139,7 @@ class _HomeState extends State<Home> {
               Text('Running on: $_platformVersion\n', maxLines: 2,),
               SizedBox(height: 20,),
               confirmButton("Init MessageQueue", (){
-                _initMessageQueue();
+                gnssSdrController.initMessageQueue();
                 messageQueueAvailable = true;
               }),
               SizedBox(height: 20,),
@@ -253,7 +178,7 @@ class _HomeState extends State<Home> {
                   showConfirmDialog("Please Init MessageQueue", "init MessageQueue by click \"Init\" and Start GPS_SDR again", 
                   (){
                     if(!messageQueueAvailable) {
-                      _initMessageQueue();
+                      gnssSdrController.initMessageQueue();
                       messageQueueAvailable = true; 
                     }
                   }, 
@@ -274,7 +199,7 @@ class _HomeState extends State<Home> {
                 }
                 else {
                   if(messageQueueAvailable) {
-                    _endMessageQueue();
+                    gnssSdrController.endMessageQueue();
                     messageQueueAvailable = false;
                   }
                 }
@@ -283,113 +208,178 @@ class _HomeState extends State<Home> {
           ),
         ),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    height: 300,
-                    width: 1280,
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.blueGrey, width: 2)
-                    ),
-                    child: MultiChoice(
-                      onSelectParam: (HashSet<String> selectedList) {
-                        // do something with param
-                        gpsPRNSelectedList = selectedList.toList();
-                        print(gpsPRNSelectedList.toString());
-                      }
-                    ),
-                  ),
-                ],
-              ),
-              Expanded(
-                child: Container(
-                  width: 1000,
-                  margin: const EdgeInsets.only(top: 10.0, bottom: 10.0, right: 10.0),
-                  padding: const EdgeInsets.all(5.0),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.blueAccent)
-                  ),
-                  child: SfCartesianChart(
-                  primaryXAxis: CategoryAxis(
-                    title: AxisTitle(text: "Satelite")
-                  ),
-                  primaryYAxis: NumericAxis(
-                    title: AxisTitle(text: "C/N0 (dB)"),
-                    minimum: 0, interval: 10
-                  ),
-                  legend: Legend(
-                    isVisible: true,
-                    alignment: ChartAlignment.near
-                  ),
-                  tooltipBehavior: _tooltip,
-                  series: <ChartSeries<_ChartData, String>>[
-                    ColumnSeries<_ChartData, String>(
-                        borderRadius: BorderRadius.all(Radius.circular(5)),
-                        dataSource: data,
-                        isVisible: true,
-                        isVisibleInLegend: true,
-                        legendItemText: "C/N0 index of\neach Satelite (dB)",
-                        legendIconType: LegendIconType.rectangle,
-                        // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
-                        xValueMapper: (_ChartData data, _) => data.x,
-                        yValueMapper: (_ChartData data, _) => data.y,
-                        name: 'dB',
-                        color: Colors.blueAccent)
-                  ]),
-                ),
-              )
-            ],
-          )
+          child: diagram(),
+          // child: Column(
+          //   crossAxisAlignment: CrossAxisAlignment.stretch,
+          //   children: [
+          //     Row(
+          //       children: [
+          //         Container(
+          //           height: 300,
+          //           width: 1280,
+          //           decoration: BoxDecoration(
+          //             border: Border.all(color: Colors.blueGrey, width: 2)
+          //           ),
+          //           child: MultiChoice(
+          //             onSelectParam: (HashSet<String> selectedList) {
+          //               // do something with param
+          //               gpsPRNSelectedList = selectedList.toList();
+          //               itemsSelected = gpsPRNSelectedList.length + 1;
+          //               gpsPRNSelectedList.sort();
+          //               print(gpsPRNSelectedList.toString());
+          //             }
+          //           ),
+          //         ),
+          //       ],
+          //     ),
+          //     Expanded(
+          //       child: Container(
+          //         width: 1000,
+          //         margin: const EdgeInsets.only(top: 10.0, bottom: 10.0, right: 10.0),
+          //         padding: const EdgeInsets.all(5.0),
+          //         decoration: BoxDecoration(
+          //           border: Border.all(color: Colors.blueAccent)
+          //         ),
+          //         child: SfCartesianChart(
+          //         plotAreaBorderWidth: 0.9,
+          //         primaryXAxis: DateTimeAxis(
+          //           title: AxisTitle(text: "Times"),
+          //           intervalType: DateTimeIntervalType.seconds,
+          //           minimum: data_1.elementAt(0).x,
+          //         ),
+          //         primaryYAxis: NumericAxis(
+          //           title: AxisTitle(text: "C/N0 (dB)"),
+          //           minimum: 30, interval: 10
+          //         ),
+          //         legend: Legend(
+          //           isVisible: true,
+          //           alignment: ChartAlignment.near
+          //         ),
+          //         tooltipBehavior: _tooltip,
+          //         series: 
+          //         itemsSelected < 2 ? 
+          //         <ChartSeries<_ChartData, DateTime>>[
+          //           LineSeries<_ChartData, DateTime>(
+          //               dataSource: data[0],
+          //               isVisible: true,
+          //               isVisibleInLegend: true,
+          //               legendItemText: "C/N0 index of\neach Satelite (dB)",
+          //               legendIconType: LegendIconType.rectangle,
+          //               // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+          //               xValueMapper: (_ChartData data, _) => data.x,
+          //               yValueMapper: (_ChartData data, _) => data.y,
+          //               name: 'dB',),
+          //         ] : 
+          //         <ChartSeries<_ChartData, DateTime>>[
+          //           for(int i = 1; i < itemsSelected; i++) 
+          //           LineSeries<_ChartData, DateTime>(
+          //               dataSource: data[i],
+          //               isVisible: true,
+          //               isVisibleInLegend: true,
+          //               legendItemText: "C/N0 index of\nSatelite ${gpsPRNSelectedList[i-1]} (dB)",
+          //               legendIconType: LegendIconType.rectangle,
+          //               // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+          //               xValueMapper: (_ChartData data, _) => data.x,
+          //               yValueMapper: (_ChartData data, _) => data.y,
+          //               name: 'dB',),
+          //         ]
+          //         ),
+          //       ),
+          //     )
+          //   ],
+          // )
         ),
-
-        // Expanded(
-        //   child: Container(
-        //       width: 1000,
-        //       margin: const EdgeInsets.all(10.0),
-        //       padding: const EdgeInsets.all(5.0),
-        //       decoration: BoxDecoration(
-        //         border: Border.all(color: Colors.blueAccent)
-        //       ),
-        //     child: SfCartesianChart(
-        //     primaryXAxis: CategoryAxis(
-        //       title: AxisTitle(text: "Satelite")
-        //     ),
-        //     primaryYAxis: NumericAxis(
-        //       title: AxisTitle(text: "C/N0 (dB)"),
-        //       minimum: 0, interval: 10
-        //     ),
-        //     legend: Legend(
-        //       isVisible: true,
-        //       alignment: ChartAlignment.near
-        //     ),
-        //     tooltipBehavior: _tooltip,
-        //     series: <ChartSeries<_ChartData, String>>[
-        //       ColumnSeries<_ChartData, String>(
-        //           borderRadius: BorderRadius.all(Radius.circular(5)),
-        //           dataSource: data,
-        //           isVisible: true,
-        //           isVisibleInLegend: true,
-        //           legendItemText: "C/N0 index of\neach Satelite (dB)",
-        //           legendIconType: LegendIconType.rectangle,
-        //           // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
-        //           xValueMapper: (_ChartData data, _) => data.x,
-        //           yValueMapper: (_ChartData data, _) => data.y,
-        //           name: 'dB',
-        //           color: Colors.blueAccent)
-        //     ]),
-        //   ),
-        // )
       ],
     );
+  }
+
+  Widget diagram() {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text("Select GPS Satellite"),
+        centerTitle: false,
+        toolbarHeight: 50,
+      ),
+      drawer: drawer(),
+      body: Container(
+          width: 1000,
+          margin: const EdgeInsets.only(top: 10.0, bottom: 10.0, right: 10.0),
+          padding: const EdgeInsets.all(5.0),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.blueAccent)
+          ),
+          child: SfCartesianChart(
+          plotAreaBorderWidth: 0.9,
+          primaryXAxis: DateTimeAxis(
+            title: AxisTitle(text: "Times"),
+            intervalType: DateTimeIntervalType.seconds,
+            minimum: data[0].elementAt(0).x,
+          ),
+          primaryYAxis: NumericAxis(
+            title: AxisTitle(text: "C/N0 (dB)"),
+            // minimum: -200000
+            // interval: 10
+          ),
+          legend: Legend(
+            isVisible: true,
+            alignment: ChartAlignment.near
+          ),
+          tooltipBehavior: _tooltip,
+          series: 
+          itemsSelected < 2 ? 
+          <ChartSeries<_ChartData, DateTime>>[
+            LineSeries<_ChartData, DateTime>(
+                dataSource: data[0],
+                isVisible: true,
+                isVisibleInLegend: true,
+                legendItemText: "C/N0 index of\neach Satelite (dB)",
+                legendIconType: LegendIconType.rectangle,
+                // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+                xValueMapper: (_ChartData data, _) => data.x,
+                yValueMapper: (_ChartData data, _) => data.y,
+                name: 'dB',),
+          ] : 
+          <ChartSeries<_ChartData, DateTime>>[
+            for(int i = 1; i < itemsSelected; i++) 
+            LineSeries<_ChartData, DateTime>(
+                dataSource: data[i],
+                isVisible: true,
+                isVisibleInLegend: true,
+                legendItemText: "C/N0 index of\nSatelite ${gpsPRNSelectedList[i-1]} (dB)",
+                legendIconType: LegendIconType.rectangle,
+                // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
+                xValueMapper: (_ChartData data, _) => data.x,
+                yValueMapper: (_ChartData data, _) => data.y,
+                name: 'dB',),
+          ]
+          ),
+        ),
+    );
+  }
+
+  Widget drawer() {
+    return Container(
+        height: 300,
+        width: 1280,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.blueGrey, width: 2)
+        ),
+        child: MultiChoice(
+          onSelectParam: (HashSet<String> selectedList) {
+            // do something with param
+            gpsPRNSelectedList = selectedList.toList();
+            itemsSelected = gpsPRNSelectedList.length + 1;
+            gpsPRNSelectedList.sort();
+            Navigator.pop(context);
+            print(gpsPRNSelectedList.toString());
+          }
+        ),
+      );
   }
 }
 
 class _ChartData {
   _ChartData(this.x, this.y);
- 
-  late String x;
+  late DateTime x;
   late double y;
 }
