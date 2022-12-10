@@ -88,8 +88,8 @@ void receiveData() {
       }
       list_Data.insert(std::make_pair(data_list[0], data_list[1]));
       list_CN0.insert(std::make_pair(data_list[0], data_list[1]));
-      list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
-      list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
+      // list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
+      // list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
 
       // get max PromptI
       it = list_PromptI.find(data_list[0]); 
