@@ -28,14 +28,8 @@ class MethodChannelNewLinuxPlugin extends NewLinuxPluginPlatform {
   }
 
   @override
-  Future<String?> receivePromptI() async {
-    final data = await methodChannel.invokeMethod<String>('receivePromptI');
-    return data;
-  }
-
-  @override
-  Future<String?> receivePromptQ() async {
-    final data = await methodChannel.invokeMethod<String>('receivePromptQ');
+  Future<String?> receiveSIRaw() async {
+    final data = await methodChannel.invokeMethod<String>('receiveSIRaw');
     return data;
   }
 

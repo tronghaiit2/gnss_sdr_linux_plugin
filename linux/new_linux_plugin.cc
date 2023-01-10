@@ -20,6 +20,8 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <cmath>
+#include <numeric>
 
 #define NEW_LINUX_PLUGIN(obj) \
   (G_TYPE_CHECK_INSTANCE_CAST((obj), new_linux_plugin_get_type(), \
@@ -44,14 +46,32 @@ key_t key;
 
 std::map<int, float> listData;
 std::map<int, float> listCN0;
-std::map<int, float> listPromptI;
-std::map<int, float> listPromptQ;
+// std::map<int, double> listSIRaw;
+std::map<int, std::vector<double>> listSIRaw;
+
+double average(std::vector<double> const& v) {
+    if (v.empty()) {
+        return 0;
+    }
+    return std::accumulate(v.begin(), v.end(), 0.0) / v.size();
+}
+
+double getAverage(std::vector<double> const& v) {
+    if (v.empty()) {
+        return 0;
+    }
+ 
+    double sum = 0.0;
+    for (const double &i: v) {
+        sum += i;
+    }
+    return sum / v.size();
+}
 
 void receiveData() {
   std::map<int, float> list_Data;
   std::map<int, float> list_CN0;
-  std::map<int, float> list_PromptI;
-  std::map<int, float> list_PromptQ;
+  std::map<int, std::vector<double>> list_SIRaw;
   long diff;
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now();
@@ -76,53 +96,38 @@ void receiveData() {
       }
     } 
     else {
-      std::vector<float> data_list;
-      std::map<int, float>::iterator it;
+      std::vector<double> data_list;
+      std::map<int, std::vector<double>>::iterator it;
       std::stringstream ss;
       ss << buf.mtext;
       while(!ss.eof()){
           std::string x;
           ss >> x;
-          float y = atof(x.c_str());
-          if(y > 0) data_list.push_back(y);
+          double y = atof(x.c_str());
+          if(y != 0) data_list.push_back(y);
       }
-      list_Data.insert(std::make_pair(data_list[0], data_list[1]));
+      // printf("recvd: %f: %.5lf\n", data_list[0], data_list[2]);
+      // list_Data.insert(std::make_pair(data_list[0], data_list[2]));
       list_CN0.insert(std::make_pair(data_list[0], data_list[1]));
-      // list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
-      // list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
 
-      // get max PromptI
-      it = list_PromptI.find(data_list[0]); 
-      if (it == list_PromptI.end()) {
-        list_PromptI.insert(std::make_pair(data_list[0], data_list[2]));
+      // Insert list SIRaw
+      it = list_SIRaw.find(data_list[0]); 
+      if (it == list_SIRaw.end()) {
+        list_SIRaw.insert(std::make_pair(data_list[0], std::vector<double>{data_list[2]}));
       }
       else {
-        if(data_list[2] > it->second) {
-          it->second = data_list[2];
-        }
+        it->second.push_back(data_list[2]);
       }
 
-      // get max PromptQ
-      it = list_PromptQ.find(data_list[0]); 
-      if (it == list_PromptQ.end()) {
-        list_PromptQ.insert(std::make_pair(data_list[0], data_list[3]));
-      }
-      else {
-        if(data_list[3] > it->second) {
-          it->second = data_list[3];
-        }
-      }
-
-      // printf("recvd: %s\n", buf.mtext);
+      printf("Siraw: %lf\n", data_list[2]);
       toend = strcmp(buf.mtext,"end");
       if (toend == 0 || sizeof(buf.mtext) == 0) 
       break;
     }
   }
-  listData = list_Data;
+  // listData = list_Data;
   listCN0 = list_CN0;
-  listPromptI = list_PromptI;
-  listPromptQ = list_PromptQ;
+  listSIRaw = list_SIRaw;
 }
 
 // Called when a method call is received from Flutter.
@@ -134,9 +139,6 @@ static void new_linux_plugin_handle_method_call(
   const gchar* method = fl_method_call_get_name(method_call);
 
   if (strcmp(method, "receiveData") == 0) {
-      // std::thread receiveDataThread(receiveData);
-      // receiveDataThread.join();
-      // receiveDataThread.detach();
       if(toend == 0 && listData.empty()) {
         g_autofree gchar *data = g_strdup_printf("%s", "end");
         g_autoptr(FlValue) result = fl_value_new_string(data);
@@ -144,7 +146,7 @@ static void new_linux_plugin_handle_method_call(
         fl_method_call_respond(method_call, response, nullptr);
       }
       else {
-        int ELEMENTSIZE = 20;
+        int ELEMENTSIZE = 32;
         int BUFSIZE = listData.size()*ELEMENTSIZE;
         char dataSent[BUFSIZE];
         strcpy(dataSent, "");
@@ -154,7 +156,7 @@ static void new_linux_plugin_handle_method_call(
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%.5f,", it->first, it->second);
             strcat(dataSent, str);
             free(str);
         }
@@ -186,7 +188,7 @@ static void new_linux_plugin_handle_method_call(
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%.5f,", it->first, it->second);
             strcat(dataSent, str);
             free(str);
         }
@@ -200,25 +202,27 @@ static void new_linux_plugin_handle_method_call(
         fl_method_call_respond(method_call, response, nullptr);
       }
   }
-  else if (strcmp(method, "receivePromptI") == 0) {
-      if(toend == 0 && listPromptI.empty()) {
+  else if (strcmp(method, "receiveSIRaw") == 0) {
+      if(toend == 0 && listSIRaw.empty()) {
         g_autofree gchar *data = g_strdup_printf("%s", "end");
         g_autoptr(FlValue) result = fl_value_new_string(data);
         response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
         fl_method_call_respond(method_call, response, nullptr);
       }
       else {
-        int ELEMENTSIZE = 20;
-        int BUFSIZE = listPromptI.size()*ELEMENTSIZE;
+        int ELEMENTSIZE = 32;
+        int BUFSIZE = listSIRaw.size()*ELEMENTSIZE;
         char dataSent[BUFSIZE];
         strcpy(dataSent, "");
         strcat(dataSent, "{");
         // strcat(dataSent, "[{\"ID\":0}");
-        for(auto it = listPromptI.cbegin(); it != listPromptI.cend(); ++it)
+        for(auto it = listSIRaw.cbegin(); it != listSIRaw.cend(); ++it)
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
+            double avg = average(it->second);
+            // double avg = getAverage(it->second);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, avg);
             strcat(dataSent, str);
             free(str);
         }
@@ -232,38 +236,6 @@ static void new_linux_plugin_handle_method_call(
         fl_method_call_respond(method_call, response, nullptr);
       }
   } 
-  else if (strcmp(method, "receivePromptQ") == 0) {
-      if(toend == 0 && listPromptQ.empty()) {
-        g_autofree gchar *data = g_strdup_printf("%s", "end");
-        g_autoptr(FlValue) result = fl_value_new_string(data);
-        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-        fl_method_call_respond(method_call, response, nullptr);
-      }
-      else {
-        int ELEMENTSIZE = 20;
-        int BUFSIZE = listPromptQ.size()*ELEMENTSIZE;
-        char dataSent[BUFSIZE];
-        strcpy(dataSent, "");
-        strcat(dataSent, "{");
-        // strcat(dataSent, "[{\"ID\":0}");
-        for(auto it = listPromptQ.cbegin(); it != listPromptQ.cend(); ++it)
-        {
-            // std::cout << it->first << " " << it->second<< "\n";
-            char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%f,", it->first, it->second);
-            strcat(dataSent, str);
-            free(str);
-        }
-        // strcat(dataSent, "]");
-        dataSent[strlen(dataSent) - 1] = '}';
-              
-        // printf("%s\n", dataSent);
-        g_autofree gchar *data = g_strdup_printf("%s", dataSent);
-        g_autoptr(FlValue) result = fl_value_new_string(data);
-        response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
-        fl_method_call_respond(method_call, response, nullptr);
-      }
-  }
   else if (strcmp(method, "sendData") == 0) {
     std::thread receiveDataThread(receiveData);
     receiveDataThread.detach();

@@ -67,7 +67,7 @@ class _HomeState extends State<Home> {
           // final String? result = await _receiveData();
           // final String? result = await _receiveCN0();
           // final String? result = await _receivePromptI();
-          final String? result = await gnssSdrController.receivePromptQ();
+          final String? result = await gnssSdrController.receiveSIRaw();
           DateTime dateTime = DateTime.now();
           if(result != null) {
             if(result == "end") {
@@ -88,12 +88,22 @@ class _HomeState extends State<Home> {
               }
               
               for(int i = 1; i < itemsSelected; i++){
-                if(data_list[gpsPRNSelectedList[i-1]] == null || data_list[gpsPRNSelectedList[i-1]] < 0) {
+                String prn = int.parse(gpsPRNSelectedList[i-1]).toString();
+
+                if(data_list[prn] == null || data_list[prn] < 0) {
                   data[i].add(_ChartData(dateTime, 0));
                 } else {
-                  data[i].add(_ChartData(dateTime, data_list[gpsPRNSelectedList[i-1]]));
+                  data[i].add(_ChartData(dateTime, data_list[prn]));
                 }
               }
+
+              // for(int i = 1; i < itemsSelected; i++){
+              //   if(data_list[gpsPRNSelectedList[i-1]] == null || data_list[gpsPRNSelectedList[i-1]] < 0) {
+              //     data[i].add(_ChartData(dateTime, 0));
+              //   } else {
+              //     data[i].add(_ChartData(dateTime, data_list[gpsPRNSelectedList[i-1]]));
+              //   }
+              // }
               
               setState(() {
                 if(data[1].length > 1) {
@@ -317,7 +327,8 @@ class _HomeState extends State<Home> {
           ),
           primaryYAxis: NumericAxis(
             title: AxisTitle(text: "C/N0 (dB)"),
-            // minimum: -200000
+            // maximum: 8000000000000,
+            // minimum: 5000000000000
             // interval: 10
           ),
           legend: Legend(
@@ -332,11 +343,12 @@ class _HomeState extends State<Home> {
                 dataSource: data[0],
                 isVisible: true,
                 isVisibleInLegend: true,
-                legendItemText: "C/N0 index of\neach Satelite (dB)",
+                legendItemText: "SI Raw index of\neach Satelite",
                 legendIconType: LegendIconType.rectangle,
                 // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
                 xValueMapper: (_ChartData data, _) => data.x,
                 yValueMapper: (_ChartData data, _) => data.y,
+                animationDuration: 0,
                 name: 'dB',),
           ] : 
           <ChartSeries<_ChartData, DateTime>>[
@@ -345,11 +357,12 @@ class _HomeState extends State<Home> {
                 dataSource: data[i],
                 isVisible: true,
                 isVisibleInLegend: true,
-                legendItemText: "C/N0 index of\nSatelite ${gpsPRNSelectedList[i-1]} (dB)",
+                legendItemText: "SI Raw index of\nSatelite ${gpsPRNSelectedList[i-1]}",
                 legendIconType: LegendIconType.rectangle,
                 // selectionBehavior: SelectionBehavior(enable: true, selectedColor: Colors.red, unselectedColor: Colors.blueAccent),
                 xValueMapper: (_ChartData data, _) => data.x,
                 yValueMapper: (_ChartData data, _) => data.y,
+                animationDuration: 0,
                 name: 'dB',),
           ]
           ),

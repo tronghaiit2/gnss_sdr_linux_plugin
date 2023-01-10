@@ -18,9 +18,7 @@ class MockNewLinuxPluginPlatform
   @override
   Future<String?> receiveCN0() => Future.value('json_test');
   @override
-  Future<String?> receivePromptI() => Future.value('json_test');
-  @override
-  Future<String?> receivePromptQ() => Future.value('json_test');
+  Future<String?> receiveSIRaw() => Future.value('json_test');
     
   @override
   Future<bool?> initMessageQueue() => Future.value(true);
@@ -74,6 +72,23 @@ void main() {
 
     expect(await newLinuxPlugin.receiveData(), 'json_test');
   });
+
+  test('receiveCN0', () async {
+    NewLinuxPlugin newLinuxPlugin = NewLinuxPlugin();
+    MockNewLinuxPluginPlatform fakePlatform = MockNewLinuxPluginPlatform();
+    NewLinuxPluginPlatform.instance = fakePlatform;
+
+    expect(await newLinuxPlugin.receiveCN0(), 'json_test');
+  });
+
+  test('receiveSIRaw', () async {
+    NewLinuxPlugin newLinuxPlugin = NewLinuxPlugin();
+    MockNewLinuxPluginPlatform fakePlatform = MockNewLinuxPluginPlatform();
+    NewLinuxPluginPlatform.instance = fakePlatform;
+
+    expect(await newLinuxPlugin.receiveSIRaw(), 'json_test');
+  });
+
 
   test('initMessageQueue', () async {
     NewLinuxPlugin newLinuxPlugin = NewLinuxPlugin();
