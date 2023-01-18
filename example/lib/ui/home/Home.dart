@@ -90,9 +90,15 @@ class _HomeState extends State<Home> {
               for(int i = 1; i < itemsSelected; i++){
                 String prn = int.parse(gpsPRNSelectedList[i-1]).toString();
 
-                if(data_list[prn] == null || data_list[prn] < 0) {
+                if(data_list[prn] == null) {
+                  if (kDebugMode) {
+                    print("data" + data_list[prn].toString());
+                  }
                   data[i].add(_ChartData(dateTime, 0));
                 } else {
+                  if (kDebugMode) {
+                    print("data" + data_list[prn].toString());
+                  }
                   data[i].add(_ChartData(dateTime, data_list[prn]));
                 }
               }
@@ -328,7 +334,7 @@ class _HomeState extends State<Home> {
           primaryYAxis: NumericAxis(
             title: AxisTitle(text: "C/N0 (dB)"),
             // maximum: 8000000000000,
-            // minimum: 5000000000000
+            // minimum: -1000000000000
             // interval: 10
           ),
           legend: Legend(
