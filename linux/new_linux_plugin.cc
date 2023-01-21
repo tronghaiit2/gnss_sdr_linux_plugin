@@ -153,8 +153,6 @@ void receiveData() {
   std::map<int, float> list_Data;
   std::map<int, float> list_CN0;
   std::vector<double> list_SIRaw[33] = {std::vector<double>(0)};
-  std::vector<double> data_list;
-  std::stringstream ss;
 
   long diff;
   std::chrono::time_point<std::chrono::system_clock> start, end;
@@ -191,6 +189,8 @@ void receiveData() {
     } 
     else {
       errorCount = 0;
+      std::vector<double> data_list;
+      std::stringstream ss;
       ss << buf.mtext;
       while(!ss.eof()){
           std::string x;
@@ -220,13 +220,11 @@ void receiveData() {
     listSiRaw1s[i] = average(list_SIRaw[i]);
   }
 
-  // start = std::chrono::system_clock::now();
   calculateS4();
-  // end = std::chrono::system_clock::now();
-  // diff = std::chrono::duration_cast< std::chrono::milliseconds >(
-  //   end.time_since_epoch() - start.time_since_epoch()).count();
-  // printf("diff: %ld\n", diff);
-  start = std::chrono::system_clock::now();
+  end = std::chrono::system_clock::now();
+  diff = std::chrono::duration_cast< std::chrono::milliseconds >(
+    end.time_since_epoch() - start.time_since_epoch()).count();
+  printf("diff: %ld\n", diff);
 
   if(toend == 0) {
     // listSiRaw1s = {0};
