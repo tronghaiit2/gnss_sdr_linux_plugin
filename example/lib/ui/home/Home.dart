@@ -67,7 +67,7 @@ class _HomeState extends State<Home> {
           // final String? result = await _receiveData();
           // final String? result = await _receiveCN0();
           // final String? result = await _receivePromptI();
-          final String? result = await gnssSdrController.receiveSIRaw();
+          final String? result = await gnssSdrController.receiveS4();
           DateTime dateTime = DateTime.now();
           if(result != null) {
             if(result == "end") {
@@ -166,6 +166,7 @@ class _HomeState extends State<Home> {
                 else {
                   if(messageQueueAvailable) {
                     // Process.run("example/assets/tmp/send", []);     
+                    // gnssSdrController.sendData();
                     isSending = true;
                   }
                 }

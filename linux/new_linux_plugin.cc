@@ -26,7 +26,7 @@
 #include "safe_queue.h"
 
 SharedQueue<std::map<int, double>> S4_T;
-int countSI = 0, prn = 0;
+int countSI = 0, prn = 0, errorCount = 0;
 bool flag = true;
 bool over60s = false;
 double SI_mean, SI_mean_2, SI_2_mean, S4_T_index;
@@ -73,21 +73,24 @@ double getAverage(std::vector<double> const& v) {
         return 0;
     }
  
-    double sum = 0.0, count = 0;
-    for (const double &i: v) {
+    double sum = 0.0;
+    int count = 0;
+    for (const double i: v) {
         if(i != 0) {
           sum += i;
           count += 1;
         }
     }
+    if(count == 0) return 0;
     return sum / count;
 }
 
 void calculateS4() {
   // Insert element = 0 in listSIRaw if ri_raw exists
   if(siRaw60s[0].size() > 60) over60s = true;
-  printf("listSiRaw1s[5]: %lf\n", listSiRaw1s[5]);
+
   for(int i = 1; i < 33; i++) {
+    // printf("listSiRaw1s[%d]: %lf\n", i, listSiRaw1s[i]);
     siRaw60s[i].push_back(listSiRaw1s[i]);
     if(over60s) {
       siRaw60s[i].erase(siRaw60s[i].begin());
@@ -103,8 +106,8 @@ void calculateS4() {
   for(int i = 1; i < 33; i++) {
     if (siRaw60s[i].size() > 0) {
       siTrend60s = getAverage(siRaw60s[i]);
-      printf("siTrend60s: %lf\n", siTrend60s);
-      for (const double &siRaw: siRaw60s[i]) {
+      // printf("prn: %d siTrend60s: %lf\n", i, siTrend60s);
+      for (const double siRaw: siRaw60s[i]) {
         if(siTrend60s != 0) {
           si60s[i].push_back(siRaw/siTrend60s);
         }
@@ -114,22 +117,30 @@ void calculateS4() {
       }
       
       countSI = 0;
-      SI_mean = average(si60s[i]);
-      SI_mean_2 = SI_mean*SI_mean;
-      for (const double &si: si60s[i]) {
-        if(si != 0) {
-          SI_2_mean += SI_2_mean + si*si;
+      SI_mean = 0;
+      SI_2_mean = 0.0;
+      if(siTrend60s != 0.0) {
+        for (const double si: si60s[i]) {
+          // printf("prn: %d si: %lf\n", i, si);
+          if(si != 0) {
+            SI_2_mean += si*si;
+            SI_mean += si;
+            countSI++;
+          }
+          else {
+            SI_2_mean += 0;
+          }
         }
-        else {
-          SI_2_mean += 0;
+        if(countSI > 0) {
+          SI_mean = SI_mean / countSI;
+          SI_mean_2 = SI_mean*SI_mean;
+          SI_2_mean = SI_2_mean / countSI;
+          S4_T_index = sqrt((SI_2_mean - SI_mean_2)/ SI_mean_2);
+          // printf("prn: %d S4_T_index: %lf\n", i, S4_T_index);
+          S4_T_pair.insert(std::make_pair(i, S4_T_index));
         }
-        countSI++;
       }
-      SI_2_mean = sqrt(SI_2_mean / countSI);
-      S4_T_index = sqrt((SI_2_mean - SI_mean_2)/ SI_mean_2);
-      S4_T_pair.insert(std::make_pair(i, S4_T_index));
     }
-
   }
 
   while(S4_T.size() > 0) {
@@ -149,27 +160,37 @@ void receiveData() {
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now();
   for(;;) {
+    // list_Data.clear();
+    // list_CN0.clear();
+    // list_SIRaw->clear();
+    // data_list.clear();
+
     end = std::chrono::system_clock::now();
     diff = std::chrono::duration_cast< std::chrono::milliseconds >(
       end.time_since_epoch() - start.time_since_epoch()).count();
-    if(diff > 500) {
-      // calS4();
+    if(diff > 900) {
       break;
     }
     ssize_t siz = msgrcv(msqid, &buf, sizeof(buf.mtext), 0, IPC_NOWAIT);
     if (siz<0) {
       if (errno == ENOMSG) 
         {
-          if(diff > 750 && list_Data.empty()) {
-            toend = 0;
-            break;
+          if(diff > 850 && list_CN0.empty()) {
+            errorCount++;
+            if(errorCount > 5) {
+              toend = 0;
+              break;
+            }
           }
         }
       else {
+        toend = 0;
         perror("msgrcv");
+        break;
       }
     } 
     else {
+      errorCount = 0;
       ss << buf.mtext;
       while(!ss.eof()){
           std::string x;
@@ -187,19 +208,32 @@ void receiveData() {
         list_SIRaw[prn].push_back(data_list[2]);
 
       }
-
       toend = strcmp(buf.mtext,"end");
       if (toend == 0 || sizeof(buf.mtext) == 0) 
       break;
-    }
+    } 
   }
+
   listCN0 = list_CN0;
   for(int i = 0; i < 33; i++){
     // printf("list_SIRaw: %lf\n", data_list[2]);
     listSiRaw1s[i] = average(list_SIRaw[i]);
   }
 
+  // start = std::chrono::system_clock::now();
   calculateS4();
+  // end = std::chrono::system_clock::now();
+  // diff = std::chrono::duration_cast< std::chrono::milliseconds >(
+  //   end.time_since_epoch() - start.time_since_epoch()).count();
+  // printf("diff: %ld\n", diff);
+  start = std::chrono::system_clock::now();
+
+  if(toend == 0) {
+    // listSiRaw1s = {0};
+    siRaw60s->clear();
+    si60s->clear();
+    return;
+  }
 }
 
 // Called when a method call is received from Flutter.
@@ -274,19 +308,17 @@ static void new_linux_plugin_handle_method_call(
         fl_method_call_respond(method_call, response, nullptr);
       }
   }
-  else if (strcmp(method, "receiveSIRaw") == 0) {
+  else if (strcmp(method, "receiveS4") == 0) {
     std::cout <<"S4_T.size(): " <<S4_T.size()<<"\n";
-      if(toend == 0 && S4_T_pair.empty()) {
-        std::cout <<"Null\n";
+      if(toend == 0 && S4_T.size() < 1) {
         g_autofree gchar *data = g_strdup_printf("%s", "end");
         g_autoptr(FlValue) result = fl_value_new_string(data);
         response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
         fl_method_call_respond(method_call, response, nullptr);
       }
       else {
-        // std::cout <<"Not Null\n";
-        // std::map<int, double> S4_T_pair;
-        // S4_T_pair = S4_T.pop_front();
+        std::map<int, double> S4_T_pair;
+        S4_T_pair = S4_T.pop_front();
         int ELEMENTSIZE = 32;
         int BUFSIZE = S4_T_pair.size()*ELEMENTSIZE;
         char dataSent[BUFSIZE];

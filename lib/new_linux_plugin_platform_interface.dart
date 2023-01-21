@@ -35,8 +35,8 @@ abstract class NewLinuxPluginPlatform extends PlatformInterface {
     throw UnimplementedError('receiveCN0() has not been implemented.');
   }
 
-  Future<String?> receiveSIRaw() {
-    throw UnimplementedError('receiveSIRaw() has not been implemented.');
+  Future<String?> receiveS4() {
+    throw UnimplementedError('receiveS4() has not been implemented.');
   }
 
   Future<bool?> sendData() {

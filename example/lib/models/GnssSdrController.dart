@@ -82,11 +82,11 @@ class GnssSdrController {
     return receiveData;
   }
 
-  Future<String?> receiveSIRaw() async {
+  Future<String?> receiveS4() async {
     String? receiveData;
     try {
       receiveData =
-          await _newLinuxPlugin.receiveSIRaw();
+          await _newLinuxPlugin.receiveS4();
     } on Exception {
       if (kDebugMode) {
         print("exception");

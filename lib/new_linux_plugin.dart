@@ -11,8 +11,8 @@ class NewLinuxPlugin {
   Future<String?> receiveCN0() {
     return NewLinuxPluginPlatform.instance.receiveCN0();
   }
-  Future<String?> receiveSIRaw() {
-    return NewLinuxPluginPlatform.instance.receiveSIRaw();
+  Future<String?> receiveS4() {
+    return NewLinuxPluginPlatform.instance.receiveS4();
   }
   Future<bool?> sendData() {
     return NewLinuxPluginPlatform.instance.sendData();
