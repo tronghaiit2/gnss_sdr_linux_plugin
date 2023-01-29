@@ -32,11 +32,11 @@ bool over60s = false;
 double SI_mean, SI_mean_2, SI_2_mean, S4_T_index;
 double listSiRaw1s[33] = {0};
 std::vector<double> siRaw60s[33] = {std::vector<double>(0)};
-std::vector<double> si60s[33] = {std::vector<double>(0)};
+// std::vector<double> si60s[33] = {std::vector<double>(0)};
 double siTrend60s = 0;
 std::map<int, float> listData;
 std::map<int, float> listCN0;
-std::map<int, double> S4_T_pair;
+// std::map<int, double> S4_T_pair;
 // std::map<int, double> listSIRaw;
 
 
@@ -101,8 +101,10 @@ void calculateS4() {
     over60s = false;
   }
 
-  S4_T_pair.clear();
-  si60s->clear();
+  std::map<int, double> S4_T_pair;
+  // S4_T_pair.clear();
+  std::vector<double> si60s[33] = {std::vector<double>(0)};
+  // si60s->clear();
   for(int i = 1; i < 33; i++) {
     if (siRaw60s[i].size() > 0) {
       siTrend60s = getAverage(siRaw60s[i]);
@@ -229,7 +231,7 @@ void receiveData() {
   if(toend == 0) {
     // listSiRaw1s = {0};
     siRaw60s->clear();
-    si60s->clear();
+    // si60s->clear();
     return;
   }
 }
