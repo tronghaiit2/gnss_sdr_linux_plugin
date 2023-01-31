@@ -34,8 +34,8 @@ double listSiRaw1s[33] = {0};
 std::vector<double> siRaw60s[33] = {std::vector<double>(0)};
 // std::vector<double> si60s[33] = {std::vector<double>(0)};
 double siTrend60s = 0;
-std::map<int, float> listData;
-std::map<int, float> listCN0;
+std::map<int, double> listData;
+std::map<int, double> listCN0;
 // std::map<int, double> S4_T_pair;
 // std::map<int, double> listSIRaw;
 
@@ -152,19 +152,16 @@ void calculateS4() {
 }
 
 void receiveData() {
-  std::map<int, float> list_Data;
-  std::map<int, float> list_CN0;
+  std::map<int, double> list_Data;
+  std::map<int, double> list_CN0;
+  double average_CNO = 0; 
+  std::vector<double> list_SNR[33] = {std::vector<double>(0)};
   std::vector<double> list_SIRaw[33] = {std::vector<double>(0)};
 
   long diff;
   std::chrono::time_point<std::chrono::system_clock> start, end;
   start = std::chrono::system_clock::now();
   for(;;) {
-    // list_Data.clear();
-    // list_CN0.clear();
-    // list_SIRaw->clear();
-    // data_list.clear();
-
     end = std::chrono::system_clock::now();
     diff = std::chrono::duration_cast< std::chrono::milliseconds >(
       end.time_since_epoch() - start.time_since_epoch()).count();
@@ -203,12 +200,12 @@ void receiveData() {
       // printf("recvd: %lf: %.5lf\n", data_list[0], data_list[2]);
       // list_Data.insert(std::make_pair(data_list[0], data_list[2]));
       prn = (int)data_list[0];
-      list_CN0.insert(std::make_pair(prn, data_list[1]));
+      // list_CN0.insert(std::make_pair(prn, data_list[1]));
+      list_SNR[prn].push_back(data_list[1]);
 
       // Insert list SIRaw
       if(data_list.size() > 2) {
         list_SIRaw[prn].push_back(data_list[2]);
-
       }
       toend = strcmp(buf.mtext,"end");
       if (toend == 0 || sizeof(buf.mtext) == 0) 
@@ -216,11 +213,14 @@ void receiveData() {
     } 
   }
 
-  listCN0 = list_CN0;
+  
   for(int i = 0; i < 33; i++){
     // printf("list_SIRaw: %lf\n", data_list[2]);
+    average_CNO = average(list_SNR[i]);
+    if(average_CNO > 0.0) list_CN0.insert(std::make_pair(i, average_CNO));
     listSiRaw1s[i] = average(list_SIRaw[i]);
   }
+  listCN0 = list_CN0;
 
   calculateS4();
   end = std::chrono::system_clock::now();
@@ -294,7 +294,7 @@ static void new_linux_plugin_handle_method_call(
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%.5f,", it->first, it->second);
+            snprintf(str, ELEMENTSIZE, "\"%d\":%.2f,", it->first, it->second);
             strcat(dataSent, str);
             free(str);
         }
@@ -324,7 +324,7 @@ static void new_linux_plugin_handle_method_call(
         char dataSent[BUFSIZE];
         strcpy(dataSent, "");
         strcat(dataSent, "{");
-        std::map<int,float>::iterator itSNR;
+        std::map<int,double>::iterator itSNR;
         double S4N0_2 = 0, SNR = 0, S4_T = 0, SI_2 = 0;
         for(auto it = S4_T_pair.cbegin(); it != S4_T_pair.cend(); ++it)
         {
