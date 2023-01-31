@@ -207,7 +207,7 @@ class _HomeState extends State<Home> {
               confirmButton("Stop receive Data", () async {
                 isSending = false;
                 loop = false;
-                // await _endData();
+                gnssSdrController.endData();
               }),
               SizedBox(height: 20,),
               confirmButton("Clear MessageQueue", (){

@@ -324,12 +324,38 @@ static void new_linux_plugin_handle_method_call(
         char dataSent[BUFSIZE];
         strcpy(dataSent, "");
         strcat(dataSent, "{");
-        // strcat(dataSent, "[{\"ID\":0}");
+        std::map<int,float>::iterator itSNR;
+        double S4N0_2 = 0, SNR = 0, S4_T = 0, SI_2 = 0;
         for(auto it = S4_T_pair.cbegin(); it != S4_T_pair.cend(); ++it)
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
-            snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, it->second);
+            // snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, it->second);
+            S4_T = it->second;
+            itSNR = listCN0.find(it->first);
+             if (itSNR == listCN0.end()) {
+              snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
+             }
+             else {
+              SNR = itSNR->second * 1000;
+              // std::cout << "SNR "<< SNR<< "\n";
+              if(S4_T == 0.0 || SNR == 0.0) {
+                snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
+              }
+              else {
+                S4N0_2 = (100/SNR)*(1+500/(19*SNR));
+                // std::cout << "S4N0_2 "<< S4N0_2<< "\n";
+                // std::cout << "S4_T "<< S4_T << "\n";
+                SI_2 = S4_T*S4_T - S4N0_2;
+                // std::cout << "SI_2 "<< SI_2 << "\n";
+                if(SI_2 > 0.0) {
+                  snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, sqrt(SI_2));
+                }
+                else {
+                  snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
+                }
+              }
+             }
             strcat(dataSent, str);
             free(str);
         }
@@ -354,9 +380,35 @@ static void new_linux_plugin_handle_method_call(
     fl_method_call_respond(method_call, response, nullptr);
   }
   else if (strcmp(method, "endData") == 0) {
-    strcpy(buf.mtext, "end");
-    if (msgsnd(msqid, &buf, 4, 0) == -1) /* +1 for '\0' */
+    struct my_msgbuf buf;
+    int msqid;
+    key_t key;
+    // system("touch /tmp/tracking.txt");
+
+    int MSIZE = 4;
+
+    const char* file = "/tmp/controlling.txt";
+    int BUFSIZE = 32;
+    char *cmd = (char*) malloc(sizeof(char) * BUFSIZE);
+    snprintf(cmd, BUFSIZE, "touch %s", file);
+    system(cmd);
+    free(cmd);
+    
+    if ((key = ftok(file, 'B')) == -1) {
+        perror("ftok");
+        // exit(1);
+    }
+    if ((msqid = msgget(key, PERMS | IPC_CREAT)) == -1) {
+        perror("msgget");
+        // exit(1);
+    }
+
+    char *str = (char*) malloc(sizeof(char) * MSIZE);
+    snprintf(str, MSIZE, "end");
+    strcpy(buf.mtext, str);
+    if (msgsnd(msqid, &buf, MSIZE, 0) == -1) /* +1 for '\0' */
     perror("msgsnd");
+    free(str);
 
     g_autoptr(FlValue) result = fl_value_new_bool(true);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(result));
