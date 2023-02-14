@@ -325,7 +325,7 @@ static void new_linux_plugin_handle_method_call(
         strcpy(dataSent, "");
         strcat(dataSent, "{");
         std::map<int,double>::iterator itSNR;
-        double S4N0_2 = 0, SNR = 0, S4_T = 0, SI_2 = 0;
+        double S4N0_2 = 0, CN0 = 0, S4_T = 0, SI_2 = 0;
         for(auto it = S4_T_pair.cbegin(); it != S4_T_pair.cend(); ++it)
         {
             // std::cout << it->first << " " << it->second<< "\n";
@@ -337,13 +337,13 @@ static void new_linux_plugin_handle_method_call(
               snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
              }
              else {
-              SNR = itSNR->second * 1000;
+              CN0 = itSNR->second * 100;
               // std::cout << "SNR "<< SNR<< "\n";
-              if(S4_T == 0.0 || SNR == 0.0) {
+              if(S4_T == 0.0 || CN0 == 0.0) {
                 snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
               }
               else {
-                S4N0_2 = (100/SNR)*(1+500/(19*SNR));
+                S4N0_2 = (100/CN0)*(1+500/(19*CN0));
                 // std::cout << "S4N0_2 "<< S4N0_2<< "\n";
                 // std::cout << "S4_T "<< S4_T << "\n";
                 SI_2 = S4_T*S4_T - S4N0_2;
