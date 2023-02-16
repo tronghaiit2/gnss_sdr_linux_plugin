@@ -27,17 +27,14 @@
 
 SharedQueue<std::map<int, double>> S4_T;
 int countSI = 0, prn = 0, errorCount = 0;
-bool flag = true;
-bool over60s = false;
-double SI_mean, SI_mean_2, SI_2_mean, S4_T_index;
+bool flag = true, over60s = false, onlyCN0 = true;
+double SI_mean, SI_mean_2, SI_2_mean, S4_T_2;
 double listSiRaw1s[33] = {0};
 std::vector<double> siRaw60s[33] = {std::vector<double>(0)};
 // std::vector<double> si60s[33] = {std::vector<double>(0)};
 double siTrend60s = 0;
-std::map<int, double> listData;
 std::map<int, double> listCN0;
-// std::map<int, double> S4_T_pair;
-// std::map<int, double> listSIRaw;
+std::map<int, double> listData;
 
 
 #define NEW_LINUX_PLUGIN(obj) \
@@ -137,9 +134,9 @@ void calculateS4() {
           SI_mean = SI_mean / countSI;
           SI_mean_2 = SI_mean*SI_mean;
           SI_2_mean = SI_2_mean / countSI;
-          S4_T_index = sqrt((SI_2_mean - SI_mean_2)/ SI_mean_2);
+          S4_T_2 = (SI_2_mean - SI_mean_2)/ SI_mean_2;
           // printf("prn: %d S4_T_index: %lf\n", i, S4_T_index);
-          S4_T_pair.insert(std::make_pair(i, S4_T_index));
+          S4_T_pair.insert(std::make_pair(i, S4_T_2));
         }
       }
     }
@@ -154,8 +151,6 @@ void calculateS4() {
 void receiveData() {
   std::map<int, double> list_Data;
   std::map<int, double> list_CN0;
-  double average_CNO = 0; 
-  std::vector<double> list_SNR[33] = {std::vector<double>(0)};
   std::vector<double> list_SIRaw[33] = {std::vector<double>(0)};
 
   long diff;
@@ -189,6 +184,7 @@ void receiveData() {
     else {
       errorCount = 0;
       std::vector<double> data_list;
+      std::map<int,double>::iterator it;
       std::stringstream ss;
       ss << buf.mtext;
       while(!ss.eof()){
@@ -200,9 +196,14 @@ void receiveData() {
       // printf("recvd: %lf: %.5lf\n", data_list[0], data_list[2]);
       // list_Data.insert(std::make_pair(data_list[0], data_list[2]));
       prn = (int)data_list[0];
-      // list_CN0.insert(std::make_pair(prn, data_list[1]));
-      list_SNR[prn].push_back(data_list[1]);
-
+      it = list_CN0.find(prn);
+      if(it == list_CN0.end()) {
+        list_CN0.insert(std::make_pair(prn, data_list[1]));
+      }
+      else {
+        if(data_list[1] > it->second) it->second = data_list[1];
+      }
+      
       // Insert list SIRaw
       if(data_list.size() > 2) {
         list_SIRaw[prn].push_back(data_list[2]);
@@ -213,20 +214,18 @@ void receiveData() {
     } 
   }
 
-  
-  for(int i = 0; i < 33; i++){
-    // printf("list_SIRaw: %lf\n", data_list[2]);
-    average_CNO = average(list_SNR[i]);
-    if(average_CNO > 0.0) list_CN0.insert(std::make_pair(i, average_CNO));
-    listSiRaw1s[i] = average(list_SIRaw[i]);
-  }
   listCN0 = list_CN0;
-
-  calculateS4();
+  // if(!onlyCN0) {
+    for(int i = 0; i < 33; i++){
+      // printf("list_SIRaw: %lf\n", data_list[2]);
+      listSiRaw1s[i] = average(list_SIRaw[i]);
+    }
+    calculateS4();
+  // }
   end = std::chrono::system_clock::now();
   diff = std::chrono::duration_cast< std::chrono::milliseconds >(
     end.time_since_epoch() - start.time_since_epoch()).count();
-  printf("diff: %ld\n", diff);
+  // printf("diff: %ld\n", diff);
 
   if(toend == 0) {
     // listSiRaw1s = {0};
@@ -277,6 +276,7 @@ static void new_linux_plugin_handle_method_call(
       }
   }
   else if (strcmp(method, "receiveCN0") == 0) {
+      onlyCN0 = true;
       if(toend == 0 && listCN0.empty()) {
         g_autofree gchar *data = g_strdup_printf("%s", "end");
         g_autoptr(FlValue) result = fl_value_new_string(data);
@@ -309,6 +309,7 @@ static void new_linux_plugin_handle_method_call(
       }
   }
   else if (strcmp(method, "receiveS4") == 0) {
+    onlyCN0 = false;
     std::cout <<"S4_T.size(): " <<S4_T.size()<<"\n";
       if(toend == 0 && S4_T.size() < 1) {
         g_autofree gchar *data = g_strdup_printf("%s", "end");
@@ -325,29 +326,25 @@ static void new_linux_plugin_handle_method_call(
         strcpy(dataSent, "");
         strcat(dataSent, "{");
         std::map<int,double>::iterator itSNR;
-        double S4N0_2 = 0, CN0 = 0, S4_T = 0, SI_2 = 0;
+        double S4N0_2 = 0, SNR = 0, S4_T_2 = 0, SI_2 = 0;
         for(auto it = S4_T_pair.cbegin(); it != S4_T_pair.cend(); ++it)
         {
             // std::cout << it->first << " " << it->second<< "\n";
             char *str = (char*) malloc(sizeof(char) * ELEMENTSIZE);
             // snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, it->second);
-            S4_T = it->second;
+            S4_T_2 = it->second;
             itSNR = listCN0.find(it->first);
              if (itSNR == listCN0.end()) {
               snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
              }
              else {
-              CN0 = itSNR->second * 100;
-              // std::cout << "SNR "<< SNR<< "\n";
-              if(S4_T == 0.0 || CN0 == 0.0) {
+              SNR = itSNR->second * 1000;
+              if(S4_T_2 == 0.0 || SNR == 0.0) {
                 snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, 0.0);
               }
               else {
-                S4N0_2 = (100/CN0)*(1+500/(19*CN0));
-                // std::cout << "S4N0_2 "<< S4N0_2<< "\n";
-                // std::cout << "S4_T "<< S4_T << "\n";
-                SI_2 = S4_T*S4_T - S4N0_2;
-                // std::cout << "SI_2 "<< SI_2 << "\n";
+                S4N0_2 = (100/SNR)*(1+500/(19*SNR));
+                SI_2 = S4_T_2 - S4N0_2;
                 if(SI_2 > 0.0) {
                   snprintf(str, ELEMENTSIZE, "\"%d\":%.5lf,", it->first, sqrt(SI_2));
                 }
